@@ -156,7 +156,8 @@ async function answerWithLLM(
   const excerpts = results
     .map((result) => {
       const id = escapeXmlAttribute(result.chunk.id);
-      return `<excerpt id="${id}">\n${result.chunk.text}\n</excerpt>`;
+      const text = escapeXmlText(result.chunk.text);
+      return `<excerpt id="${id}">\n${text}\n</excerpt>`;
     })
     .join("\n\n");
   const userContent = `${excerpts}\n\nQuestion: ${question}`;
@@ -244,4 +245,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function escapeXmlAttribute(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+function escapeXmlText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
