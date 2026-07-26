@@ -38,19 +38,23 @@ jobs:
       - name: Build production application
         run: npm run build
 
+      - name: Rebuild audit package tree
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+
       - name: Capture production dependency audit
         run: |
           set +e
-          npm audit --omit=dev --audit-level=high --legacy-peer-deps --json > npm-audit.json
+          npm audit --omit=dev --audit-level=high --json > npm-audit.json
           status=$?
           echo "$status" > npm-audit-status.txt
           exit 0
 
-      - name: Upload dependency audit diagnostics
+      - name: Upload lockfile and audit diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: npm-audit-diagnostics
+          name: npm-lock-and-audit
           path: |
+            package-lock.json
             npm-audit.json
             npm-audit-status.txt
           retention-days: 3
