@@ -6,60 +6,16 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  prepare-lockfile:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Check out pull-request branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-
-      - name: Generate patched lockfile
-        run: npm install --package-lock-only --ignore-scripts --no-audit
-
-      - name: Commit patched lockfile when changed
-        run: |
-          if git diff --quiet -- package-lock.json; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "Regenerate patched dependency lockfile"
-          git push origin HEAD:${{ github.head_ref }}
-
-      - name: Upload patched lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: patched-lockfile
-          path: package-lock.json
-          retention-days: 3
-
   verify:
-    needs: prepare-lockfile
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Download patched lockfile
-        uses: actions/download-artifact@v4
-        with:
-          name: patched-lockfile
-          path: .
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -73,25 +29,8 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
-      - name: Capture lint diagnostics
-        run: |
-          set +e
-          npm run lint > eslint.log 2>&1
-          status=$?
-          echo "$status" > eslint-status.txt
-          exit 0
-
-      - name: Upload lint diagnostics
-        uses: actions/upload-artifact@v4
-        with:
-          name: eslint-diagnostics
-          path: |
-            eslint.log
-            eslint-status.txt
-          retention-days: 3
-
-      - name: Enforce lint
-        run: test "$(cat eslint-status.txt)" -eq 0
+      - name: Lint
+        run: npm run lint
 
       - name: Run tests
         run: npm test
@@ -100,12 +39,10 @@ jobs:
         run: npm run build
 
   dependency-scan:
-    needs: prepare-lockfile
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.8
     with:
       scan-args: |-
         --lockfile=package-lock.json
-      download-artifact: patched-lockfile
       upload-sarif: false
       fail-on-vuln: true
     permissions:
