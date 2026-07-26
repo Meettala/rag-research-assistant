@@ -38,5 +38,22 @@ jobs:
       - name: Build production application
         run: npm run build
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Capture production dependency audit
+        run: |
+          set +e
+          npm audit --omit=dev --audit-level=high --json > npm-audit.json
+          status=$?
+          echo "$status" > npm-audit-status.txt
+          exit 0
+
+      - name: Upload dependency audit diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-diagnostics
+          path: |
+            npm-audit.json
+            npm-audit-status.txt
+          retention-days: 3
+
+      - name: Enforce production dependency audit
+        run: test "$(cat npm-audit-status.txt)" -eq 0
