@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chunkDocument } from "@/rag/chunk";
+import { chunkDocument, type Chunk } from "@/rag/chunk";
 import { buildIndex, retrieve } from "@/rag/retrieval";
 
 const DOC = `The Apollo 11 mission launched on July 16, 1969, carrying astronauts Neil Armstrong, Buzz Aldrin, and Michael Collins.
@@ -27,8 +27,13 @@ describe("retrieval", () => {
   });
 
   it("respects topK", () => {
-    const index = buildIndex(chunkDocument(DOC));
-    expect(retrieve(index, "mission", 2)).toHaveLength(2);
+    const chunks: Chunk[] = [
+      { id: "chunk_0", index: 0, text: "Moon mission details" },
+      { id: "chunk_1", index: 1, text: "Mission launch timeline" },
+      { id: "chunk_2", index: 2, text: "Mission return summary" },
+    ];
+
+    expect(retrieve(buildIndex(chunks), "mission", 2)).toHaveLength(2);
   });
 
   it("returns no results for an empty corpus", () => {
@@ -52,9 +57,12 @@ describe("retrieval", () => {
   });
 
   it("uses chunk order as a deterministic tie-breaker", () => {
-    const chunks = chunkDocument("Alpha topic.\n\nBeta topic.");
+    const chunks: Chunk[] = [
+      { id: "chunk_0", index: 0, text: "Alpha topic" },
+      { id: "chunk_1", index: 1, text: "Beta topic" },
+    ];
     const results = retrieve(buildIndex(chunks), "unknown term", 2);
 
-    expect(results.map((result) => result.chunk.index)).toEqual([0]);
+    expect(results.map((result) => result.chunk.index)).toEqual([0, 1]);
   });
 });
