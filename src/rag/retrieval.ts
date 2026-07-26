@@ -1,19 +1,71 @@
 /**
- * TF-IDF + cosine similarity retrieval. A real, explainable vector-search
- * technique that needs zero API key and zero external service — so
- * retrieval always works, even before an LLM key is configured (see
- * answer.ts for how the retrieved chunks are then turned into an answer).
+ * Explainable TF-IDF retrieval with cosine similarity.
+ *
+ * This module is deterministic, local and provider-independent. It treats
+ * document and question text as inert data and never evaluates either input.
  */
 
 import type { Chunk } from "./chunk";
 
 const STOPWORDS = new Set([
-  "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "be",
-  "been", "being", "to", "of", "in", "on", "at", "for", "with", "by",
-  "from", "as", "that", "this", "it", "its", "these", "those", "i", "you",
-  "he", "she", "we", "they", "what", "which", "who", "whom", "if", "then",
-  "than", "so", "not", "no", "do", "does", "did", "have", "has", "had",
-  "will", "would", "can", "could", "should", "may", "might",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "to",
+  "of",
+  "in",
+  "on",
+  "at",
+  "for",
+  "with",
+  "by",
+  "from",
+  "as",
+  "that",
+  "this",
+  "it",
+  "its",
+  "these",
+  "those",
+  "i",
+  "you",
+  "he",
+  "she",
+  "we",
+  "they",
+  "what",
+  "which",
+  "who",
+  "whom",
+  "if",
+  "then",
+  "than",
+  "so",
+  "not",
+  "no",
+  "do",
+  "does",
+  "did",
+  "have",
+  "has",
+  "had",
+  "will",
+  "would",
+  "can",
+  "could",
+  "should",
+  "may",
+  "might",
 ]);
 
 function tokenize(text: string): string[] {
@@ -21,73 +73,98 @@ function tokenize(text: string): string[] {
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter((t) => t.length > 1 && !STOPWORDS.has(t));
+    .filter((token) => token.length > 1 && !STOPWORDS.has(token));
 }
 
 export type VectorIndex = {
   chunks: Chunk[];
   vocabulary: string[];
   idf: Map<string, number>;
-  vectors: Map<string, number>[]; // one per chunk
+  vectors: Map<string, number>[];
 };
 
 export function buildIndex(chunks: Chunk[]): VectorIndex {
-  const tokenizedChunks = chunks.map((c) => tokenize(c.text));
-  const df = new Map<string, number>();
+  const tokenizedChunks = chunks.map((chunk) => tokenize(chunk.text));
+  const documentFrequency = new Map<string, number>();
 
   for (const tokens of tokenizedChunks) {
-    const seen = new Set(tokens);
-    for (const term of seen) {
-      df.set(term, (df.get(term) ?? 0) + 1);
+    for (const term of new Set(tokens)) {
+      documentFrequency.set(
+        term,
+        (documentFrequency.get(term) ?? 0) + 1,
+      );
     }
   }
 
-  const N = chunks.length;
+  const documentCount = chunks.length;
   const idf = new Map<string, number>();
-  for (const [term, count] of df.entries()) {
-    idf.set(term, Math.log((N + 1) / (count + 1)) + 1);
+  for (const [term, count] of documentFrequency.entries()) {
+    idf.set(term, Math.log((documentCount + 1) / (count + 1)) + 1);
   }
 
-  const vectors = tokenizedChunks.map((tokens) => {
-    const tf = new Map<string, number>();
-    for (const term of tokens) {
-      tf.set(term, (tf.get(term) ?? 0) + 1);
-    }
-    const vec = new Map<string, number>();
-    for (const [term, count] of tf.entries()) {
-      vec.set(term, (count / tokens.length) * (idf.get(term) ?? 0));
-    }
-    return vec;
-  });
+  const vectors = tokenizedChunks.map((tokens) => vectorizeTokens(tokens, idf));
 
-  return { chunks, vocabulary: Array.from(df.keys()), idf, vectors };
+  return {
+    chunks: [...chunks],
+    vocabulary: Array.from(documentFrequency.keys()).sort(),
+    idf,
+    vectors,
+  };
 }
 
-function vectorizeQuery(query: string, idf: Map<string, number>): Map<string, number> {
-  const tokens = tokenize(query);
-  const tf = new Map<string, number>();
+function vectorizeTokens(
+  tokens: string[],
+  idf: Map<string, number>,
+): Map<string, number> {
+  const vector = new Map<string, number>();
+  if (tokens.length === 0) return vector;
+
+  const termFrequency = new Map<string, number>();
   for (const term of tokens) {
-    tf.set(term, (tf.get(term) ?? 0) + 1);
+    termFrequency.set(term, (termFrequency.get(term) ?? 0) + 1);
   }
-  const vec = new Map<string, number>();
-  for (const [term, count] of tf.entries()) {
-    if (idf.has(term)) {
-      vec.set(term, (count / tokens.length) * (idf.get(term) ?? 0));
+
+  for (const [term, count] of termFrequency.entries()) {
+    const inverseDocumentFrequency = idf.get(term);
+    if (inverseDocumentFrequency !== undefined) {
+      vector.set(term, (count / tokens.length) * inverseDocumentFrequency);
     }
   }
-  return vec;
+
+  return vector;
 }
 
-function cosineSimilarity(a: Map<string, number>, b: Map<string, number>): number {
-  let dot = 0;
+function vectorizeQuery(
+  query: string,
+  idf: Map<string, number>,
+): Map<string, number> {
+  return vectorizeTokens(tokenize(query), idf);
+}
+
+function cosineSimilarity(
+  a: Map<string, number>,
+  b: Map<string, number>,
+): number {
+  let dotProduct = 0;
   for (const [term, weight] of a.entries()) {
-    const other = b.get(term);
-    if (other) dot += weight * other;
+    dotProduct += weight * (b.get(term) ?? 0);
   }
-  const normA = Math.sqrt(Array.from(a.values()).reduce((s, v) => s + v * v, 0));
-  const normB = Math.sqrt(Array.from(b.values()).reduce((s, v) => s + v * v, 0));
+
+  const normA = vectorNorm(a);
+  const normB = vectorNorm(b);
   if (normA === 0 || normB === 0) return 0;
-  return dot / (normA * normB);
+
+  const score = dotProduct / (normA * normB);
+  return Number.isFinite(score) ? score : 0;
+}
+
+function vectorNorm(vector: Map<string, number>): number {
+  return Math.sqrt(
+    Array.from(vector.values()).reduce(
+      (sum, value) => sum + value * value,
+      0,
+    ),
+  );
 }
 
 export type RetrievalResult = {
@@ -95,11 +172,25 @@ export type RetrievalResult = {
   score: number;
 };
 
-export function retrieve(index: VectorIndex, query: string, topK = 3): RetrievalResult[] {
-  const queryVec = vectorizeQuery(query, index.idf);
-  const scored = index.chunks.map((chunk, i) => ({
-    chunk,
-    score: cosineSimilarity(queryVec, index.vectors[i]),
-  }));
-  return scored.sort((a, b) => b.score - a.score).slice(0, topK);
+export function retrieve(
+  index: VectorIndex,
+  query: string,
+  topK = 3,
+): RetrievalResult[] {
+  const limit = Number.isFinite(topK) ? Math.max(0, Math.floor(topK)) : 0;
+  if (limit === 0 || index.chunks.length === 0) return [];
+
+  const queryVector = vectorizeQuery(query, index.idf);
+  return index.chunks
+    .map((chunk, indexPosition) => ({
+      chunk,
+      score: cosineSimilarity(queryVector, index.vectors[indexPosition]),
+    }))
+    .sort((left, right) => {
+      const scoreDifference = right.score - left.score;
+      return scoreDifference !== 0
+        ? scoreDifference
+        : left.chunk.index - right.chunk.index;
+    })
+    .slice(0, limit);
 }
