@@ -1,97 +1,128 @@
 # AI Handoff — RAG Research Assistant
 
-> Paste this file into ChatGPT, Claude, Gemini, Copilot, Perplexity, or another AI assistant to continue the project without restarting it. Always verify the live repository, open pull requests, current branch, package versions, and CI status before changing anything.
+> Paste this file into ChatGPT, Claude, Gemini, Copilot, Perplexity, or another AI assistant to continue the project without restarting it. Verify the live `main` branch, open pull requests, current dependencies and latest CI before changing anything.
 
 ## Continuation instruction
 
-You are continuing `Meettala/rag-research-assistant`, a public portfolio project owned by Meet Tala.
+You are continuing `Meettala/rag-research-assistant`, a public MIT-licensed portfolio and reference implementation owned by Meet Tala.
 
-Do not replace the architecture casually or weaken the evidence-grounding and untrusted-document safety model. Inspect the live code, tests, README, security documentation, package files, and active pull request before editing. Add or update tests for behavioural changes. Update this file after material code, architecture, security, dependency, deployment, documentation, licensing, roadmap, screenshot, or demo work.
+Do not weaken the evidence-grounding model, local extractive mode, no-answer threshold or provider citation boundary. Read the live code, tests, `README.md`, `SECURITY.md`, `docs/architecture.md`, `docs/roadmap.md` and `docs/PORTFOLIO_PRESENTATION_GUIDE.md` before editing. Add tests for behavioural changes and update this file after material code, security, dependency, deployment, documentation, screenshot or demo work.
 
-Never commit API keys, private documents, customer data, private prompts, production infrastructure details, or confidential commercial information.
+Never commit API keys, private documents, customer data, private prompts, production infrastructure details or confidential commercial information.
 
 ## Repository state
 
 - Repository: `Meettala/rag-research-assistant`
 - Default branch: `main`
 - Working branch: `agent/professional-repository-foundation`
-- Repository visibility: public
-- Existing pull requests before this work: none
-- Latest verified `main` commit when work began: `5324d84d7013680f00979f9570ec602f430f0ae0`
-- CI on the starting commit: no GitHub Actions workflow run was present
-- Project stack: Next.js 16, React 19, TypeScript, Tailwind CSS, Vitest
+- Active pull request: Draft PR #1, `Professionalize RAG research assistant`
+- Starting `main` commit: `5324d84d7013680f00979f9570ec602f430f0ae0`
+- Stack: Next.js 16, React 19, TypeScript, Tailwind CSS and Vitest
+- Licence: MIT on the working branch
 - Last updated: 26 July 2026
 
 ## Product purpose
 
-The application accepts pasted document text and a research question, retrieves relevant chunks, and returns an answer with citations. It supports:
+The application accepts pasted document evidence and a research question, builds a local TF-IDF index, retrieves relevant chunks and returns either a cited answer or an explicit not-covered result.
 
-- a no-key extractive mode using TF-IDF retrieval and cosine similarity;
-- optional OpenAI or Anthropic synthesis over retrieved excerpts;
-- an explicit not-covered response when retrieval confidence is insufficient;
-- citations identifying the supporting chunks.
+The no-key mode is extractive and local. Optional OpenAI or Anthropic synthesis operates only over retrieved excerpts and remains subordinate to strict provider-response and citation validation.
 
-## Intended safety properties
+## Core trust model
 
-1. Document text is untrusted data, not system instructions.
-2. The default extractive path returns retrieved text rather than generating unsupported claims.
-3. Optional LLM synthesis must use only retrieved evidence and retain citations.
-4. Prompt-like content inside documents must remain inert.
-5. Low-confidence questions must return a clear not-covered answer instead of guessing.
-6. No API key is required for the core local experience.
-7. Secrets and private documents must not be committed or exposed in logs, examples, screenshots, or public CI artifacts.
+1. Request JSON, document text, questions and provider output are untrusted.
+2. Input is type-checked, trimmed and size-limited before processing.
+3. Retrieval occurs before answering.
+4. Low retrieval confidence returns not covered rather than guessing.
+5. Extractive mode returns the strongest retrieved passage with its chunk citation.
+6. Provider mode accepts only a JSON object containing `answer` and `cited_chunk_ids`.
+7. Unknown provider fields, empty answers, missing citations, invalid citation types and citations outside the retrieved allow-list are rejected.
+8. Provider HTTP failures, timeouts and malformed output fall back to extractive mode.
+9. Raw provider failures and private document content must not be exposed in the UI or public logs.
+10. The project does not claim to eliminate every hallucination or prompt-injection risk.
 
-These are intended properties from the existing README and security documentation. They must be verified against the live implementation and automated tests before being described as fully proven.
+## Implemented on the professionalisation branch
 
-## Initial verified repository observations
+### Reliability and security
 
-- `package.json` defines `dev`, `build`, `start`, and `lint` scripts.
-- Vitest is installed, but a dedicated `test` script is not currently defined.
-- The README states that 11 tests cover chunking, retrieval, extractive answers, no-answer fallback, and prompt-injection resistance; this count and behaviour require a fresh CI-backed verification.
-- No GitHub Actions workflow was present on the starting commit.
-- The documentation references `PROJECT_STATUS.md`, but that file was not present on the live repository when this handoff was created.
-- The public repository is currently marked private in `package.json` only in the npm-publication sense (`"private": true`); the GitHub repository itself is public.
+- Added `src/rag/request.ts` for strict request validation.
+- Added document and question character limits.
+- Added safe malformed-JSON and internal-error responses in the API route.
+- Added strict `InvalidProviderAnswer` handling.
+- Added provider JSON shape and unknown-field validation.
+- Added retrieved-chunk citation allow-listing.
+- Added provider HTTP status checks and 15-second timeouts.
+- Replaced raw provider-error logging with a generic fallback message.
+- Preserved no-key extractive fallback.
+- Hardened TF-IDF retrieval for empty corpora, invalid `topK`, empty token sets, deterministic ties and non-finite scores.
 
-## Audit and professionalisation plan
+### Tests
 
-Continue in this order unless live findings require reprioritisation:
+- Preserved original chunking, retrieval, answer and prompt-injection tests.
+- Added strict provider-output tests.
+- Added unavailable-citation rejection tests.
+- Added offline provider HTTP failure and malformed-citation fallback tests.
+- Added request validation and size-limit tests.
+- Added retrieval edge-case tests.
 
-1. Inspect all RAG modules, API routes, UI code, tests, configuration, and documentation.
-2. Establish a clean baseline by running or adding CI for install, TypeScript checking, linting, tests, and production build.
-3. Add a proper `test` script and deterministic quality commands.
-4. Verify retrieval thresholds, chunk identifiers, citation integrity, and not-covered behaviour.
-5. Audit optional provider code for malformed responses, timeout/error handling, secret-safe logging, and evidence-only prompts.
-6. Add tests for prompt injection, unsupported questions, empty documents, duplicate chunks, invalid provider output, and citation correctness.
-7. Improve user-facing errors without exposing internal or provider details.
-8. Add repository governance: licence, security policy, contribution guide, changelog, architecture, roadmap, and pull-request template where missing.
-9. Add dependency/security scanning and reproducible setup guidance.
-10. Add Docker/local demo support if useful and appropriate for this Next.js project.
-11. Rework README for recruiters, technical reviewers, and job applications without unsupported claims.
-12. Add portfolio presentation assets and a beginner-friendly presentation guide.
-13. Keep the pull request draft until all required checks pass.
-14. Merge intentionally into `main` only after final architecture, security, documentation, and recruiter-readiness review.
+### Engineering quality
+
+- Added `test`, `typecheck`, `test:watch` and `verify` npm scripts.
+- Added GitHub Actions for `npm ci`, TypeScript, zero-warning ESLint, Vitest, production build and high-severity production dependency audit.
+- Added standalone Next.js output.
+- Added a multi-stage non-root Docker image and health check.
+- Added `.dockerignore` exclusions for secrets, caches and local files.
+
+### Portfolio and governance
+
+- Reworked the UI into an accessible evidence-first portfolio experience.
+- Reworked the README for recruiters and technical reviewers.
+- Added MIT `LICENSE`.
+- Added `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md` and a pull-request template.
+- Added `docs/architecture.md`, `docs/roadmap.md` and commercial/private-production guidance.
+- Added architecture and social-preview SVG assets.
+- Added `docs/PORTFOLIO_PRESENTATION_GUIDE.md` with screenshot, demo, GitHub metadata, CV and interview instructions.
+
+## Validation status
+
+Verified on the integrated branch before the latest retrieval-test correction:
+
+- dependency installation passed;
+- TypeScript checking passed;
+- ESLint passed with zero warnings;
+- the test stage reached one incorrect new test assumption because the sample document could form one chunk.
+
+That test now uses an explicit three-chunk corpus. A fresh full CI run is required. Do not claim the latest branch is green until GitHub confirms tests, production build and dependency audit on the current head.
 
 ## Decisions to preserve
 
-- Evidence grounding takes priority over fluent but unsupported answers.
-- Extractive no-key mode remains a first-class product mode.
-- Optional providers must remain subordinate to retrieval and citation controls.
-- Public examples and screenshots must use synthetic or non-sensitive documents.
-- Documentation claims must be supported by code, tests, CI, or measured evidence.
-- Future paid production development should be separated from the public portfolio repository when private commercial controls are required.
+- Evidence grounding takes priority over fluent unsupported answers.
+- Extractive no-key mode remains a first-class mode.
+- Provider output is untrusted and may cite only retrieved chunks.
+- Provider failure falls back safely.
+- Public examples use synthetic or non-sensitive documents.
+- Documentation claims require code, tests, CI or measured evidence.
+- Future paid production work belongs in a separate private proprietary repository.
+- Neither the demo nor a future service should be described as completely secure, hallucination-free or immune to all prompt injection.
+
+## Known limitations
+
+- TF-IDF is lexical and can miss semantically equivalent wording.
+- The no-answer threshold needs a larger labelled evaluation set.
+- Input is pasted text only; PDF and DOCX parsing are future work.
+- The app handles one in-memory document per request and has no identity or persistence.
+- Provider retry, latency and cost instrumentation are not implemented.
+- Docker is suitable for local demonstration, not a complete production platform.
+- A real app screenshot or video must be captured from a running instance; repository SVG assets are already available.
+
+## Immediate next work
+
+1. Confirm full CI on the current branch head.
+2. Fix any remaining test, build or dependency-audit finding without weakening the gates.
+3. Update the PR description with the completed scope and verified result.
+4. Perform final security, architecture, documentation and recruiter review.
+5. Mark PR #1 ready and squash-merge only after the exact final head is green and mergeable.
+6. Capture a real screenshot/demo and upload the rendered social-preview PNG manually after merge.
 
 ## Rules for another AI
 
-Before editing:
-
-- inspect the live branch and pull requests;
-- verify current dependency versions and framework documentation;
-- read the actual implementation and tests rather than trusting this summary alone;
-- do not ask the user to repeat information already recorded here.
-
-Before finishing a work session:
-
-- verify install, type checking, linting, tests, build, and security checks where configured;
-- record facts rather than assumptions;
-- update this file and the pull-request description;
-- state any unresolved blocker clearly.
+Before editing, inspect the live branch, PR, CI and implementation rather than trusting this summary alone. Keep changes scoped, add positive and negative tests, never expose secrets or private documents, and update this file and the PR when project status changes.
