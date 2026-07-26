@@ -41,7 +41,7 @@ jobs:
       - name: Capture production dependency audit
         run: |
           set +e
-          npm audit --omit=dev --audit-level=high --json > npm-audit.json
+          npm audit --omit=dev --audit-level=high --legacy-peer-deps --json > npm-audit.json
           status=$?
           echo "$status" > npm-audit-status.txt
           exit 0
