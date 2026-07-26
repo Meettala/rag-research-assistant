@@ -9,13 +9,44 @@ permissions:
   contents: read
 
 jobs:
+  prepare-lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Generate patched lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+
+      - name: Upload patched lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: patched-lockfile
+          path: package-lock.json
+          retention-days: 3
+
   verify:
+    needs: prepare-lockfile
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Download patched lockfile
+        uses: actions/download-artifact@v4
+        with:
+          name: patched-lockfile
+          path: .
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -39,10 +70,12 @@ jobs:
         run: npm run build
 
   dependency-scan:
+    needs: prepare-lockfile
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.8
     with:
       scan-args: |-
         --lockfile=package-lock.json
+      download-artifact: patched-lockfile
       upload-sarif: false
       fail-on-vuln: true
     permissions:
