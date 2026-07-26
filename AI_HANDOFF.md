@@ -1,12 +1,12 @@
 # AI Handoff — RAG Research Assistant
 
-> Paste this file into ChatGPT, Claude, Gemini, Copilot, Perplexity, or another AI assistant to continue the project without restarting it. Verify the live `main` branch, open pull requests, current dependencies and latest CI before changing anything.
+> Paste this file into ChatGPT, Claude, Gemini, Copilot, Perplexity, or another AI assistant to continue the project without restarting it. Verify the live `main` branch, open pull requests, dependency versions and latest CI before changing anything.
 
 ## Continuation instruction
 
 You are continuing `Meettala/rag-research-assistant`, a public MIT-licensed portfolio and reference implementation owned by Meet Tala.
 
-Do not weaken the evidence-grounding model, local extractive mode, no-answer threshold or provider citation boundary. Read the live code, tests, `README.md`, `SECURITY.md`, `docs/architecture.md`, `docs/roadmap.md` and `docs/PORTFOLIO_PRESENTATION_GUIDE.md` before editing. Add tests for behavioural changes and update this file after material code, security, dependency, deployment, documentation, screenshot or demo work.
+Do not weaken the evidence-grounding model, local extractive mode, no-answer threshold, excerpt delimiter escaping or provider citation boundary. Read the live code, tests, `README.md`, `SECURITY.md`, `docs/architecture.md`, `docs/roadmap.md`, `osv-scanner.toml` and `docs/PORTFOLIO_PRESENTATION_GUIDE.md` before editing. Add tests for behavioural changes and update this file after material code, security, dependency, deployment, documentation, screenshot or demo work.
 
 Never commit API keys, private documents, customer data, private prompts, production infrastructure details or confidential commercial information.
 
@@ -14,11 +14,11 @@ Never commit API keys, private documents, customer data, private prompts, produc
 
 - Repository: `Meettala/rag-research-assistant`
 - Default branch: `main`
-- Working branch: `agent/professional-repository-foundation`
-- Active pull request: Draft PR #1, `Professionalize RAG research assistant`
+- Professionalisation branch: `agent/professional-repository-foundation`
+- Pull request: PR #1, `Professionalize RAG research assistant`
 - Starting `main` commit: `5324d84d7013680f00979f9570ec602f430f0ae0`
-- Stack: Next.js 16, React 19, TypeScript, Tailwind CSS and Vitest
-- Licence: MIT on the working branch
+- Stack: Next.js 16.2.11, React 19, TypeScript, Tailwind CSS and Vitest
+- Licence: MIT
 - Last updated: 26 July 2026
 
 ## Product purpose
@@ -34,64 +34,79 @@ The no-key mode is extractive and local. Optional OpenAI or Anthropic synthesis 
 3. Retrieval occurs before answering.
 4. Low retrieval confidence returns not covered rather than guessing.
 5. Extractive mode returns the strongest retrieved passage with its chunk citation.
-6. Provider mode accepts only a JSON object containing `answer` and `cited_chunk_ids`.
-7. Unknown provider fields, empty answers, missing citations, invalid citation types and citations outside the retrieved allow-list are rejected.
-8. Provider HTTP failures, timeouts and malformed output fall back to extractive mode.
-9. Raw provider failures and private document content must not be exposed in the UI or public logs.
-10. The project does not claim to eliminate every hallucination or prompt-injection risk.
+6. Document excerpts are delimiter-escaped before optional provider submission.
+7. Provider mode accepts only a JSON object containing `answer` and `cited_chunk_ids`.
+8. Unknown fields, empty answers, missing citations, invalid citation types and citations outside the retrieved allow-list are rejected.
+9. Provider HTTP failures, timeouts and malformed output fall back to extractive mode.
+10. Raw provider failures and private document content are not exposed in the UI.
+11. The project does not claim to eliminate every hallucination or prompt-injection risk.
 
-## Implemented on the professionalisation branch
+## Implemented
 
 ### Reliability and security
 
-- Added `src/rag/request.ts` for strict request validation.
-- Added document and question character limits.
-- Added safe malformed-JSON and internal-error responses in the API route.
-- Added strict `InvalidProviderAnswer` handling.
-- Added provider JSON shape and unknown-field validation.
-- Added retrieved-chunk citation allow-listing.
-- Added provider HTTP status checks and 15-second timeouts.
-- Replaced raw provider-error logging with a generic fallback message.
-- Preserved no-key extractive fallback.
-- Hardened TF-IDF retrieval for empty corpora, invalid `topK`, empty token sets, deterministic ties and non-finite scores.
+- Strict request validation and document/question size limits.
+- Safe malformed-JSON and internal-error API responses.
+- Strict provider output parsing and unknown-field rejection.
+- Retrieved-chunk citation allow-listing.
+- Provider HTTP status checks and 15-second timeouts.
+- Generic provider-failure logging and extractive fallback.
+- XML delimiter escaping for untrusted excerpt text.
+- Deterministic TF-IDF behaviour for empty corpora, invalid `topK`, empty token sets, ties and non-finite scores.
 
 ### Tests
 
-- Preserved original chunking, retrieval, answer and prompt-injection tests.
-- Added strict provider-output tests.
-- Added unavailable-citation rejection tests.
-- Added offline provider HTTP failure and malformed-citation fallback tests.
-- Added request validation and size-limit tests.
-- Added retrieval edge-case tests.
+- Chunking and retrieval relevance.
+- Empty/invalid retrieval inputs and deterministic ranking.
+- Extractive and not-covered behaviour.
+- Prompt-injection resistance.
+- Request validation and size limits.
+- Strict provider output validation.
+- Citation allow-listing and provider fallback.
+- Excerpt delimiter-escape regression coverage.
 
 ### Engineering quality
 
-- Added `test`, `typecheck`, `test:watch` and `verify` npm scripts.
-- Added GitHub Actions for `npm ci`, TypeScript, zero-warning ESLint, Vitest, production build and high-severity production dependency audit.
-- Added standalone Next.js output.
-- Added a multi-stage non-root Docker image and health check.
-- Added `.dockerignore` exclusions for secrets, caches and local files.
+- `npm ci`, TypeScript, zero-warning ESLint, Vitest and production Next.js build in GitHub Actions.
+- Google OSV-Scanner v2.3.8 against `package-lock.json`.
+- Next.js 16.2.11, PostCSS 8.5.18 and Sharp 0.35.0 patched after OSV findings.
+- Reproducible committed lockfile.
+- Standalone Next.js output and a multi-stage non-root Docker image with health check.
 
 ### Portfolio and governance
 
-- Reworked the UI into an accessible evidence-first portfolio experience.
-- Reworked the README for recruiters and technical reviewers.
-- Added MIT `LICENSE`.
-- Added `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md` and a pull-request template.
-- Added `docs/architecture.md`, `docs/roadmap.md` and commercial/private-production guidance.
-- Added architecture and social-preview SVG assets.
-- Added `docs/PORTFOLIO_PRESENTATION_GUIDE.md` with screenshot, demo, GitHub metadata, CV and interview instructions.
+- Accessible evidence-first UI.
+- Recruiter-focused README.
+- MIT licence, security policy, contribution guide, changelog and PR template.
+- Architecture, roadmap and commercial/private-production documentation.
+- Architecture and social-preview SVG assets.
+- Beginner-friendly portfolio presentation guide.
 
-## Validation status
+## Dependency exception
 
-Verified on the integrated branch before the latest retrieval-test correction:
+`osv-scanner.toml` temporarily ignores only `CVE-2026-14257` for old `brace-expansion` copies used by ESLint/minimatch development tooling.
+
+Reason:
+
+- the affected package is not included in the standalone production runtime;
+- the repository does not pass user-controlled glob patterns into ESLint tooling;
+- forcing `brace-expansion` 5.0.8 into minimatch 3 breaks ESLint because the APIs are incompatible;
+- the exception must be removed when the upstream ESLint dependency chain supports a patched compatible version.
+
+Do not broaden this exception or add new ignores without a documented reachability and compatibility review.
+
+## Verified validation status
+
+Workflow run 38 verified the integrated implementation and generated lockfile:
 
 - dependency installation passed;
-- TypeScript checking passed;
+- TypeScript passed;
 - ESLint passed with zero warnings;
-- the test stage reached one incorrect new test assumption because the sample document could form one chunk.
+- all Vitest tests passed;
+- the production Next.js build passed;
+- OSV-Scanner passed with the documented dev-only exception.
 
-That test now uses an explicit three-chunk corpus. A fresh full CI run is required. Do not claim the latest branch is green until GitHub confirms tests, production build and dependency audit on the current head.
+A final clean workflow must still run after the streamlined CI and this handoff update. Do not claim a newer commit is green until GitHub confirms it.
 
 ## Decisions to preserve
 
@@ -114,14 +129,13 @@ That test now uses an explicit three-chunk corpus. A fresh full CI run is requir
 - Docker is suitable for local demonstration, not a complete production platform.
 - A real app screenshot or video must be captured from a running instance; repository SVG assets are already available.
 
-## Immediate next work
+## Remaining presentation work after merge
 
-1. Confirm full CI on the current branch head.
-2. Fix any remaining test, build or dependency-audit finding without weakening the gates.
-3. Update the PR description with the completed scope and verified result.
-4. Perform final security, architecture, documentation and recruiter review.
-5. Mark PR #1 ready and squash-merge only after the exact final head is green and mergeable.
-6. Capture a real screenshot/demo and upload the rendered social-preview PNG manually after merge.
+1. Run or deploy the application.
+2. Capture a clean screenshot and a 30–60 second demo.
+3. Add the real media to the README/portfolio.
+4. Render `docs/assets/social-preview.svg` to PNG and upload it in GitHub repository settings.
+5. Follow `docs/PORTFOLIO_PRESENTATION_GUIDE.md` for CV, LinkedIn and interview wording.
 
 ## Rules for another AI
 
