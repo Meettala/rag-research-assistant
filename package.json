@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run typecheck && npm run lint && npm test && npm run build"
+    "eval": "vitest run --config vitest.eval.config.ts",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run eval && npm run build"
   },
   "dependencies": {
     "next": "16.2.11",

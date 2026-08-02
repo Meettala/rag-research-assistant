@@ -1,0 +1,16 @@
+{
+  "description": "Minimum acceptable metrics. The evaluation run fails when any measured metric falls below its floor, or above its ceiling for the rate metrics. These values are ratcheted upward as the pipeline improves; they are never lowered to make a failing run pass. Baseline recorded 2 August 2026; raised after the evidence-coverage gate landed.",
+  "minimums": {
+    "hitAtOne": 0.9459,
+    "hitAtThree": 1.0,
+    "mrr": 0.973,
+    "answerAccuracy": 0.7297,
+    "abstentionRecall": 0.9,
+    "overallAccuracy": 0.7895
+  },
+  "maximums": {
+    "overRefusalRate": 0.2432,
+    "falseAnswerRate": 0.1,
+    "meanAnswerChars": 435
+  }
+}

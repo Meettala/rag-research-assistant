@@ -1,68 +1,58 @@
-/**
- * Splits document text into overlapping chunks for retrieval.
- *
- * Kept simple and paragraph-aware rather than a fixed character window,
- * so citations point to something a human would recognize as "a passage"
- * rather than an arbitrary character slice.
- */
+/** Paragraph-aware chunking with calibrated size and overlap. */
 
-export type Chunk = {
-  id: string;
-  text: string;
-  index: number;
+export type Chunk = { id: string; text: string; index: number };
+
+export const TARGET_CHUNK_CHARS = 600;
+export const OVERLAP_CHARS = 75;
+export const DEFAULT_TARGET_CHUNK_CHARS = TARGET_CHUNK_CHARS;
+export const DEFAULT_OVERLAP_CHARS = OVERLAP_CHARS;
+
+export type ChunkOptions = {
+  targetChars?: number;
+  overlapChars?: number;
 };
 
-const TARGET_CHUNK_CHARS = 800;
-const OVERLAP_CHARS = 150;
-
-export function chunkDocument(text: string): Chunk[] {
+export function chunkDocument(
+  text: string,
+  optionsOrTarget: ChunkOptions | number = {},
+  legacyOverlap = OVERLAP_CHARS,
+): Chunk[] {
+  const options = typeof optionsOrTarget === "number"
+    ? { targetChars: optionsOrTarget, overlapChars: legacyOverlap }
+    : optionsOrTarget;
   const normalized = text.replace(/\r\n/g, "\n").trim();
-  const paragraphs = normalized
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-
+  if (!normalized) return [];
+  const target = Math.max(100, Math.floor(options.targetChars ?? TARGET_CHUNK_CHARS));
+  const overlap = Math.max(0, Math.min(Math.floor(options.overlapChars ?? OVERLAP_CHARS), target - 1));
+  const paragraphs = normalized.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   const chunks: Chunk[] = [];
   let buffer = "";
-
   const flush = () => {
-    if (buffer.trim().length > 0) {
-      chunks.push({
-        id: `chunk_${chunks.length}`,
-        text: buffer.trim(),
-        index: chunks.length,
-      });
-    }
+    if (buffer.trim()) chunks.push({ id: `chunk_${chunks.length}`, text: buffer.trim(), index: chunks.length });
   };
-
-  for (const para of paragraphs) {
-    if (buffer.length + para.length > TARGET_CHUNK_CHARS && buffer.length > 0) {
+  for (const paragraph of paragraphs) {
+    if (buffer.length + paragraph.length > target && buffer.length > 0) {
       flush();
-      // carry a small overlap forward so context isn't lost at boundaries
-      buffer = buffer.slice(-OVERLAP_CHARS) + "\n\n" + para;
+      buffer = `${buffer.slice(-overlap)}\n\n${paragraph}`;
     } else {
-      buffer = buffer ? buffer + "\n\n" + para : para;
+      buffer = buffer ? `${buffer}\n\n${paragraph}` : paragraph;
     }
   }
   flush();
-
-  // Fallback: if the whole document was one giant paragraph with no
-  // blank-line breaks, hard-wrap it so we still get multiple chunks.
-  if (chunks.length <= 1 && normalized.length > TARGET_CHUNK_CHARS * 1.5) {
-    return hardWrap(normalized);
-  }
-
+  if (chunks.length <= 1 && normalized.length > target * 1.5) return hardWrap(normalized, target, overlap);
   return chunks;
 }
 
-function hardWrap(text: string): Chunk[] {
+function hardWrap(text: string, target: number, overlap: number): Chunk[] {
   const chunks: Chunk[] = [];
   let start = 0;
   while (start < text.length) {
-    const end = Math.min(start + TARGET_CHUNK_CHARS, text.length);
+    const end = Math.min(start + target, text.length);
     chunks.push({ id: `chunk_${chunks.length}`, text: text.slice(start, end).trim(), index: chunks.length });
-    start = end - OVERLAP_CHARS;
-    if (start <= 0 || end === text.length) break;
+    if (end === text.length) break;
+    const next = end - overlap;
+    if (next <= start) break;
+    start = next;
   }
   return chunks;
 }
