@@ -27,6 +27,14 @@ export const NO_ANSWER_THRESHOLD = 0.08;
 const QUESTION_STOPWORDS = new Set([
   "how", "much", "many", "long", "often", "when", "where", "why", "whose",
   "any", "there", "about", "kind", "sort", "type",
+  // Analytical framing terms describe how to compare evidence rather than the
+  // business fact that must appear in the passage. Keeping them out prevents
+  // questions such as "Which department had the highest adoption?" from
+  // requiring the literal word "department" when the passage directly states
+  // that engineers had 91% adoption.
+  "highest", "lowest", "largest", "smallest", "most", "least", "top", "bottom",
+  "department", "departments", "team", "teams", "group", "groups", "category",
+  "categories",
 ]);
 
 export function normalizeTerm(term: string): string {
