@@ -31,6 +31,8 @@ export type AnswerResult = {
 
 export type AnswerOptions = {
   index?: VectorIndex;
+  /** Optional evaluation override; production uses the calibrated default. */
+  coverageThreshold?: number;
 };
 
 export class InvalidProviderAnswer extends Error {
@@ -55,7 +57,12 @@ export async function answerQuestion(
   let coverage = 0;
 
   if (options.index) {
-    const decision = assessAnswerability(question, results, options.index);
+    const decision = assessAnswerability(
+      question,
+      results,
+      options.index,
+      options.coverageThreshold,
+    );
     reason = decision.reason;
     coverage = decision.signals.evidenceCoverage;
     if (!decision.answerable) {
