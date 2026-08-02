@@ -1,0 +1,40 @@
+name: Apply evaluation bundle
+
+on:
+  push:
+    branches:
+      - agent/evaluation-and-abstention
+    paths:
+      - .automation/eval-only.zip
+      - .github/workflows/apply-evaluation-bundle.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/evaluation-and-abstention
+          fetch-depth: 0
+
+      - name: Apply supplied evaluation files
+        run: |
+          rm -rf .automation/unpacked
+          mkdir -p .automation/unpacked
+          unzip -q .automation/eval-only.zip -d .automation/unpacked
+          cp -R .automation/unpacked/. .
+          rm -rf .automation
+          rm .github/workflows/apply-evaluation-bundle.yml
+
+      - name: Commit applied evaluation bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add measured RAG evaluation harness and release evidence"
+          git push origin HEAD:agent/evaluation-and-abstention
