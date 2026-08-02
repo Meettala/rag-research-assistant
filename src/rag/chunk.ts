@@ -2,18 +2,28 @@
 
 export type Chunk = { id: string; text: string; index: number };
 
-export const DEFAULT_TARGET_CHUNK_CHARS = 600;
-export const DEFAULT_OVERLAP_CHARS = 75;
+export const TARGET_CHUNK_CHARS = 600;
+export const OVERLAP_CHARS = 75;
+export const DEFAULT_TARGET_CHUNK_CHARS = TARGET_CHUNK_CHARS;
+export const DEFAULT_OVERLAP_CHARS = OVERLAP_CHARS;
+
+export type ChunkOptions = {
+  targetChars?: number;
+  overlapChars?: number;
+};
 
 export function chunkDocument(
   text: string,
-  targetChunkChars = DEFAULT_TARGET_CHUNK_CHARS,
-  overlapChars = DEFAULT_OVERLAP_CHARS,
+  optionsOrTarget: ChunkOptions | number = {},
+  legacyOverlap = OVERLAP_CHARS,
 ): Chunk[] {
+  const options = typeof optionsOrTarget === "number"
+    ? { targetChars: optionsOrTarget, overlapChars: legacyOverlap }
+    : optionsOrTarget;
   const normalized = text.replace(/\r\n/g, "\n").trim();
   if (!normalized) return [];
-  const target = Math.max(100, Math.floor(targetChunkChars));
-  const overlap = Math.max(0, Math.min(Math.floor(overlapChars), target - 1));
+  const target = Math.max(100, Math.floor(options.targetChars ?? TARGET_CHUNK_CHARS));
+  const overlap = Math.max(0, Math.min(Math.floor(options.overlapChars ?? OVERLAP_CHARS), target - 1));
   const paragraphs = normalized.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   const chunks: Chunk[] = [];
   let buffer = "";
