@@ -1,8 +1,9 @@
 /**
- * Narrows an extractive answer from a retrieved chunk to the smallest useful
- * sentence window. Production defaults to no surrounding padding; one sentence
- * is preferred, with a two-sentence pair used only when it carries more of the
- * question's evidence.
+ * Narrows an extractive answer from a retrieved chunk to at most the most
+ * relevant two-sentence window. A neighbouring sentence is retained when it
+ * preserves the same evidence coverage, which avoids stripping away the
+ * answer-bearing sentence from short question/answer-style paragraphs while
+ * still removing the old +/-2-sentence padding.
  */
 
 import { normalizeTerm, questionContentTerms } from "./answerability";
@@ -76,7 +77,7 @@ export function selectAnswerSpan(
       const chars = window.join(" ").length;
       if (
         weight > bestWeight ||
-        (weight === bestWeight && length < bestLength) ||
+        (weight === bestWeight && length > bestLength) ||
         (weight === bestWeight && length === bestLength && chars < bestChars)
       ) {
         bestWeight = weight;
