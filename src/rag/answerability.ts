@@ -79,6 +79,7 @@ export type AnswerabilityDecision = {
   reason: "supported" | "no_relevant_chunk" | "insufficient_evidence";
   selectedIndex: number;
   supportKind: AnswerabilitySupportKind;
+  supportSpan?: string;
   signals: AnswerabilitySignals;
 };
 
@@ -149,6 +150,7 @@ type SpecialSupport = {
   selectedIndex: number;
   coverage: number;
   kind: Exclude<AnswerabilitySupportKind, "standard">;
+  span: string;
 };
 
 function weightedCoverageForTerms(
@@ -196,6 +198,10 @@ function splitEvidenceSentences(text: string): string[] {
     .filter(Boolean);
 }
 
+function sentenceWithFollowingContext(sentences: string[], index: number): string {
+  return sentences.slice(index, Math.min(sentences.length, index + 2)).join(" ");
+}
+
 function findExplicitNegativeSupport(
   question: string,
   results: RetrievalResult[],
@@ -209,12 +215,19 @@ function findExplicitNegativeSupport(
 
   for (let position = 0; position < results.length; position += 1) {
     if (results[position].score < NO_ANSWER_THRESHOLD) continue;
-    for (const sentence of splitEvidenceSentences(results[position].chunk.text)) {
+    const sentences = splitEvidenceSentences(results[position].chunk.text);
+    for (let sentenceIndex = 0; sentenceIndex < sentences.length; sentenceIndex += 1) {
+      const sentence = sentences[sentenceIndex];
       if (!hasExplicitNegativeEvidence(sentence)) continue;
       const match = weightedCoverageForTerms(propositionTerms, sentence, normalizedIdf);
       if (match.overlapCount < minimumOverlap || match.coverage < 0.6) continue;
       if (!best || match.coverage > best.coverage) {
-        best = { selectedIndex: position, coverage: match.coverage, kind: "explicit_negative" };
+        best = {
+          selectedIndex: position,
+          coverage: match.coverage,
+          kind: "explicit_negative",
+          span: sentenceWithFollowingContext(sentences, sentenceIndex),
+        };
       }
     }
   }
@@ -232,14 +245,28 @@ function findInstructionDescriptionSupport(
 
   for (let position = 0; position < results.length; position += 1) {
     const result = results[position];
-    if (result.score < NO_ANSWER_THRESHOLD || !INSTRUCTION_EVIDENCE.test(result.chunk.text)) continue;
-    const match = weightedCoverageForTerms(descriptiveTerms, result.chunk.text, normalizedIdf);
-    const supported = descriptiveTerms.length === 0
-      ? true
-      : match.overlapCount >= 1 && match.coverage >= 0.5;
-    if (!supported) continue;
-    if (!best || match.coverage > best.coverage) {
-      best = { selectedIndex: position, coverage: match.coverage, kind: "instruction_description" };
+    if (result.score < NO_ANSWER_THRESHOLD) continue;
+    const sentences = splitEvidenceSentences(result.chunk.text);
+    for (let sentenceIndex = 0; sentenceIndex < sentences.length; sentenceIndex += 1) {
+      for (const length of [1, 2]) {
+        if (sentenceIndex + length > sentences.length) continue;
+        const span = sentences.slice(sentenceIndex, sentenceIndex + length).join(" ");
+        if (!INSTRUCTION_EVIDENCE.test(span)) continue;
+        const match = weightedCoverageForTerms(descriptiveTerms, span, normalizedIdf);
+        const supported = descriptiveTerms.length === 0
+          ? true
+          : match.overlapCount >= 1 && match.coverage >= 0.5;
+        if (!supported) continue;
+        if (!best || match.coverage > best.coverage ||
+            (match.coverage === best.coverage && span.length < best.span.length)) {
+          best = {
+            selectedIndex: position,
+            coverage: match.coverage,
+            kind: "instruction_description",
+            span,
+          };
+        }
+      }
     }
   }
   return best;
@@ -281,6 +308,7 @@ export function assessAnswerability(
       reason: "supported",
       selectedIndex: negativeSupport.selectedIndex,
       supportKind: negativeSupport.kind,
+      supportSpan: negativeSupport.span,
       signals: {
         topScore,
         evidenceCoverage: Math.max(bestCoverage, negativeSupport.coverage),
@@ -296,6 +324,7 @@ export function assessAnswerability(
       reason: "supported",
       selectedIndex: instructionSupport.selectedIndex,
       supportKind: instructionSupport.kind,
+      supportSpan: instructionSupport.span,
       signals: {
         topScore,
         evidenceCoverage: Math.max(bestCoverage, instructionSupport.coverage),
