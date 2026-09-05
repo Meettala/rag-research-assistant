@@ -41,6 +41,7 @@ const INSTRUCTION_META_TERMS = new Set([
 ]);
 
 const EXPLICIT_NEGATION = /\b(?:no|not|never|none|without|did not|does not|do not|is not|are not|was not|were not|has not|have not|had not|cannot|can't|won't|didn't|doesn't|isn't|aren't|wasn't|weren't)\b/i;
+const DIRECT_NEGATION_START = /^(?:no|not|never|none)\b/i;
 const YES_NO_START = /^(?:did|does|do|is|are|was|were|has|have|had|can|could|will|would|should)\b/i;
 const INSTRUCTION_NOUN = /\b(?:sentence|instruction|text|message|passage|prompt)\b/i;
 const INSTRUCTION_REPORTING_VERB = /\b(?:say|says|said|tell|tells|told|claim|claims|claimed|state|states|stated|instruct|instructs|instructed|describe|describes|described|quote|quoted)\b/i;
@@ -151,6 +152,7 @@ type SpecialSupport = {
   coverage: number;
   kind: Exclude<AnswerabilitySupportKind, "standard">;
   span: string;
+  directNegative?: boolean;
 };
 
 function weightedCoverageForTerms(
@@ -221,12 +223,18 @@ function findExplicitNegativeSupport(
       if (!hasExplicitNegativeEvidence(sentence)) continue;
       const match = weightedCoverageForTerms(propositionTerms, sentence, normalizedIdf);
       if (match.overlapCount < minimumOverlap || match.coverage < 0.6) continue;
-      if (!best || match.coverage > best.coverage) {
+      const directNegative = DIRECT_NEGATION_START.test(sentence);
+      if (
+        !best ||
+        (directNegative && !best.directNegative) ||
+        (directNegative === Boolean(best.directNegative) && match.coverage > best.coverage)
+      ) {
         best = {
           selectedIndex: position,
           coverage: match.coverage,
           kind: "explicit_negative",
           span: sentenceWithFollowingContext(sentences, sentenceIndex),
+          directNegative,
         };
       }
     }
