@@ -1,8 +1,9 @@
 /**
- * Narrows direct quantitative/time/ranking answers to at most the most relevant
- * two-sentence window. Other supported questions keep the retrieved evidence
- * chunk: lexical overlap is not strong enough evidence that a shorter sentence
- * contains the answer, and stripping context there can reduce correctness.
+ * Narrows an extractive answer to at most the most relevant two-sentence
+ * window. The production answer pipeline calls this compact selector only for
+ * direct quantitative/time/ranking questions; other supported questions keep
+ * the retrieved evidence chunk because lexical overlap alone is not strong
+ * enough evidence that a shorter sentence contains the answer.
  */
 
 import { normalizeTerm, questionContentTerms } from "./answerability";
@@ -13,6 +14,11 @@ const COMPACT_QUESTION = /\b(?:how many|how much|how long|how often|how late|how
 const REPORTED_METRIC_QUESTION = /\b(?:record|recorded|report|reported|measure|measured)\b/i;
 const DIRECT_MEASURE = /(?:£|\$|€|\b\d+(?:\.\d+)?\s*(?:%|percent|hours?|days?|minutes?|weeks?|months?|years?|a\.m\.|p\.m\.)\b)/i;
 const PERIOD_MARKER = "<period>";
+
+export function shouldCompactAnswer(question: string, passageText: string): boolean {
+  return COMPACT_QUESTION.test(question) ||
+    (REPORTED_METRIC_QUESTION.test(question) && DIRECT_MEASURE.test(passageText));
+}
 
 function protectAbbreviations(text: string): string {
   return text
@@ -65,10 +71,6 @@ export function selectAnswerSpan(
   normalizedIdf: Map<string, number>,
   contextSentences: number = DEFAULT_CONTEXT_SENTENCES,
 ): string {
-  const shouldCompact = COMPACT_QUESTION.test(question) ||
-    (REPORTED_METRIC_QUESTION.test(question) && DIRECT_MEASURE.test(passageText));
-  if (!shouldCompact) return passageText.trim();
-
   const sentences = splitSentences(passageText);
   if (sentences.length <= 1) return passageText.trim();
 
