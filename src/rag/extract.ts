@@ -10,6 +10,8 @@ import { normalizeTerm, questionContentTerms } from "./answerability";
 const DEFAULT_CONTEXT_SENTENCES = 0;
 const MAX_EVIDENCE_SENTENCES = 2;
 const COMPACT_QUESTION = /\b(?:how many|how much|how long|how often|how late|how quickly|when|highest|lowest|largest|smallest|rate|average|mean|total|percent|percentage|cost|benefit|saving|time)\b/i;
+const REPORTED_METRIC_QUESTION = /\b(?:record|recorded|report|reported|measure|measured)\b/i;
+const DIRECT_MEASURE = /(?:£|\$|€|\b\d+(?:\.\d+)?\s*(?:%|percent|hours?|days?|minutes?|weeks?|months?|years?|a\.m\.|p\.m\.)\b)/i;
 const PERIOD_MARKER = "<period>";
 
 function protectAbbreviations(text: string): string {
@@ -63,7 +65,9 @@ export function selectAnswerSpan(
   normalizedIdf: Map<string, number>,
   contextSentences: number = DEFAULT_CONTEXT_SENTENCES,
 ): string {
-  if (!COMPACT_QUESTION.test(question)) return passageText.trim();
+  const shouldCompact = COMPACT_QUESTION.test(question) ||
+    (REPORTED_METRIC_QUESTION.test(question) && DIRECT_MEASURE.test(passageText));
+  if (!shouldCompact) return passageText.trim();
 
   const sentences = splitSentences(passageText);
   if (sentences.length <= 1) return passageText.trim();
