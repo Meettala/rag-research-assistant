@@ -1,20 +1,32 @@
 /**
- * Narrows an extractive answer from a retrieved chunk to at most the most
- * relevant two-sentence window. A neighbouring sentence is retained when it
- * preserves the same evidence coverage, which avoids stripping away the
- * answer-bearing sentence from short question/answer-style paragraphs while
- * still removing the old +/-2-sentence padding.
+ * Narrows direct quantitative/time/ranking answers to at most the most relevant
+ * two-sentence window. Other supported questions keep the retrieved evidence
+ * chunk: lexical overlap is not strong enough evidence that a shorter sentence
+ * contains the answer, and stripping context there can reduce correctness.
  */
 
 import { normalizeTerm, questionContentTerms } from "./answerability";
 
 const DEFAULT_CONTEXT_SENTENCES = 0;
 const MAX_EVIDENCE_SENTENCES = 2;
+const COMPACT_QUESTION = /\b(?:how many|how much|how long|how often|how late|how quickly|when|highest|lowest|largest|smallest|rate|average|mean|total|percent|percentage|cost|benefit|saving|time)\b/i;
+const PERIOD_MARKER = "<period>";
+
+function protectAbbreviations(text: string): string {
+  return text
+    .replace(/\b([ap])\.m\./gi, (_, marker: string) => `${marker}${PERIOD_MARKER}m${PERIOD_MARKER}`)
+    .replace(/\b(i)\.e\./gi, (_, marker: string) => `${marker}${PERIOD_MARKER}e${PERIOD_MARKER}`)
+    .replace(/\b(e)\.g\./gi, (_, marker: string) => `${marker}${PERIOD_MARKER}g${PERIOD_MARKER}`);
+}
+
+function restoreAbbreviations(text: string): string {
+  return text.replaceAll(PERIOD_MARKER, ".");
+}
 
 export function splitSentences(text: string): string[] {
-  return text
+  return protectAbbreviations(text)
     .split(/(?<=[.!?])\s+|\n{2,}/)
-    .map((sentence) => sentence.trim())
+    .map((sentence) => restoreAbbreviations(sentence.trim()))
     .filter((sentence) => sentence.length > 0);
 }
 
@@ -51,6 +63,8 @@ export function selectAnswerSpan(
   normalizedIdf: Map<string, number>,
   contextSentences: number = DEFAULT_CONTEXT_SENTENCES,
 ): string {
+  if (!COMPACT_QUESTION.test(question)) return passageText.trim();
+
   const sentences = splitSentences(passageText);
   if (sentences.length <= 1) return passageText.trim();
 
