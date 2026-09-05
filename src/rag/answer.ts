@@ -57,6 +57,7 @@ export async function answerQuestion(
   let reason: AnswerResult["reason"] = "supported";
   let coverage = 0;
   let supportKind: AnswerabilitySupportKind = "standard";
+  let supportSpan: string | undefined;
 
   if (options.index) {
     const decision = assessAnswerability(
@@ -68,6 +69,7 @@ export async function answerQuestion(
     reason = decision.reason;
     coverage = decision.signals.evidenceCoverage;
     supportKind = decision.supportKind;
+    supportSpan = decision.supportSpan;
     if (!decision.answerable) {
       return {
         answer: NOT_COVERED_MESSAGE,
@@ -110,6 +112,7 @@ export async function answerQuestion(
     reason,
     coverage,
     supportKind,
+    supportSpan,
   );
 }
 
@@ -121,6 +124,7 @@ function answerExtractively(
   reason: AnswerResult["reason"],
   evidenceCoverage: number,
   supportKind: AnswerabilitySupportKind,
+  supportSpan: string | undefined,
 ): AnswerResult {
   const best = results[0];
   if (!best) {
@@ -134,9 +138,9 @@ function answerExtractively(
     };
   }
 
-  const span = index
+  const span = supportSpan ?? (index
     ? selectAnswerSpan(question, best.chunk.text, buildNormalizedIdf(index))
-    : best.chunk.text;
+    : best.chunk.text);
   const answer = supportKind === "explicit_negative"
     ? `No. ${span}`
     : supportKind === "instruction_description"
