@@ -26,6 +26,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Trace current vulnerable dependency chains
+        run: |
+          npm explain nanoid || true
+          npm explain postcss || true
+          npm explain brace-expansion || true
+          npm explain browserslist || true
+          npm explain js-yaml || true
+
       - name: Audit production dependencies
         run: npm audit --omit=dev
 
