@@ -10,6 +10,7 @@ import {
   assessAnswerability,
   buildNormalizedIdf,
   NO_ANSWER_THRESHOLD,
+  type AnswerabilitySupportKind,
 } from "./answerability";
 import { selectAnswerSpan } from "./extract";
 import type { RetrievalResult, VectorIndex } from "./retrieval";
@@ -55,6 +56,7 @@ export async function answerQuestion(
   let selectedResults = results;
   let reason: AnswerResult["reason"] = "supported";
   let coverage = 0;
+  let supportKind: AnswerabilitySupportKind = "standard";
 
   if (options.index) {
     const decision = assessAnswerability(
@@ -65,6 +67,7 @@ export async function answerQuestion(
     );
     reason = decision.reason;
     coverage = decision.signals.evidenceCoverage;
+    supportKind = decision.supportKind;
     if (!decision.answerable) {
       return {
         answer: NOT_COVERED_MESSAGE,
@@ -99,7 +102,15 @@ export async function answerQuestion(
     }
   }
 
-  return answerExtractively(question, selectedResults, topScore, options.index, reason, coverage);
+  return answerExtractively(
+    question,
+    selectedResults,
+    topScore,
+    options.index,
+    reason,
+    coverage,
+    supportKind,
+  );
 }
 
 function answerExtractively(
@@ -109,6 +120,7 @@ function answerExtractively(
   index: VectorIndex | undefined,
   reason: AnswerResult["reason"],
   evidenceCoverage: number,
+  supportKind: AnswerabilitySupportKind,
 ): AnswerResult {
   const best = results[0];
   if (!best) {
@@ -122,9 +134,14 @@ function answerExtractively(
     };
   }
 
-  const answer = index
+  const span = index
     ? selectAnswerSpan(question, best.chunk.text, buildNormalizedIdf(index))
     : best.chunk.text;
+  const answer = supportKind === "explicit_negative"
+    ? `No. ${span}`
+    : supportKind === "instruction_description"
+      ? `The document says: ${span}`
+      : span;
 
   return {
     answer,
