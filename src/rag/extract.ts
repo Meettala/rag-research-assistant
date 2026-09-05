@@ -1,11 +1,14 @@
 /**
- * Narrows an extractive answer from a whole retrieved chunk to the shortest
- * contiguous run of sentences that still carries the question's evidence.
+ * Narrows an extractive answer from a retrieved chunk to the smallest useful
+ * sentence window. Production defaults to no surrounding padding; one sentence
+ * is preferred, with a two-sentence pair used only when it carries more of the
+ * question's evidence.
  */
 
 import { normalizeTerm, questionContentTerms } from "./answerability";
 
-const CONTEXT_SENTENCES = 2;
+const DEFAULT_CONTEXT_SENTENCES = 0;
+const MAX_EVIDENCE_SENTENCES = 2;
 
 export function splitSentences(text: string): string[] {
   return text
@@ -14,16 +17,29 @@ export function splitSentences(text: string): string[] {
     .filter((sentence) => sentence.length > 0);
 }
 
+function termSet(text: string): Set<string> {
+  return new Set(questionContentTerms(text).map(normalizeTerm));
+}
+
+function unseenTermWeight(normalizedIdf: Map<string, number>): number {
+  let maximum = 1;
+  for (const value of normalizedIdf.values()) if (value > maximum) maximum = value;
+  return maximum;
+}
+
 function coveredWeight(
-  sentence: string,
+  sentences: string[],
   questionTerms: Set<string>,
   normalizedIdf: Map<string, number>,
   unseenWeight: number,
 ): number {
-  const sentenceTerms = new Set(questionContentTerms(sentence).map(normalizeTerm));
+  const windowTerms = new Set<string>();
+  for (const sentence of sentences) {
+    for (const term of termSet(sentence)) windowTerms.add(term);
+  }
   let weight = 0;
   for (const term of questionTerms) {
-    if (sentenceTerms.has(term)) weight += normalizedIdf.get(term) ?? unseenWeight;
+    if (windowTerms.has(term)) weight += normalizedIdf.get(term) ?? unseenWeight;
   }
   return weight;
 }
@@ -32,36 +48,49 @@ export function selectAnswerSpan(
   question: string,
   passageText: string,
   normalizedIdf: Map<string, number>,
-  contextSentences: number = CONTEXT_SENTENCES,
+  contextSentences: number = DEFAULT_CONTEXT_SENTENCES,
 ): string {
   const sentences = splitSentences(passageText);
   if (sentences.length <= 1) return passageText.trim();
-  const questionTerms = new Set(questionContentTerms(question).map(normalizeTerm));
-  if (questionTerms.size === 0) return passageText.trim();
-  let unseenWeight = 1;
-  for (const value of normalizedIdf.values()) if (value > unseenWeight) unseenWeight = value;
-  const sentenceWeights = sentences.map((sentence) =>
-    coveredWeight(sentence, questionTerms, normalizedIdf, unseenWeight),
+
+  const rawQuestionTerms = new Set(questionContentTerms(question).map(normalizeTerm));
+  if (rawQuestionTerms.size === 0) return passageText.trim();
+
+  const passageTerms = termSet(passageText);
+  const questionTerms = new Set(
+    [...rawQuestionTerms].filter((term) => passageTerms.has(term)),
   );
-  const totalWeight = sentenceWeights.reduce((sum, weight) => sum + weight, 0);
-  if (totalWeight <= 0) return passageText.trim();
+  if (questionTerms.size === 0) return passageText.trim();
+
+  const unseenWeight = unseenTermWeight(normalizedIdf);
   let bestStart = 0;
-  let bestLength = sentences.length;
-  for (let start = 0; start < sentences.length; start += 1) {
-    let weight = 0;
-    for (let end = start; end < sentences.length; end += 1) {
-      weight += sentenceWeights[end];
-      if (weight >= totalWeight) {
-        const length = end - start + 1;
-        if (length < bestLength) {
-          bestLength = length;
-          bestStart = start;
-        }
-        break;
+  let bestLength = 1;
+  let bestWeight = -1;
+  let bestChars = Number.POSITIVE_INFINITY;
+  const maxLength = Math.min(MAX_EVIDENCE_SENTENCES, sentences.length);
+
+  for (let length = 1; length <= maxLength; length += 1) {
+    for (let start = 0; start + length <= sentences.length; start += 1) {
+      const window = sentences.slice(start, start + length);
+      const weight = coveredWeight(window, questionTerms, normalizedIdf, unseenWeight);
+      const chars = window.join(" ").length;
+      if (
+        weight > bestWeight ||
+        (weight === bestWeight && length < bestLength) ||
+        (weight === bestWeight && length === bestLength && chars < bestChars)
+      ) {
+        bestWeight = weight;
+        bestStart = start;
+        bestLength = length;
+        bestChars = chars;
       }
     }
   }
-  const paddedStart = Math.max(0, bestStart - contextSentences);
-  const paddedEnd = Math.min(sentences.length, bestStart + bestLength + contextSentences);
+
+  if (bestWeight <= 0) return passageText.trim();
+
+  const padding = Math.max(0, Math.floor(contextSentences));
+  const paddedStart = Math.max(0, bestStart - padding);
+  const paddedEnd = Math.min(sentences.length, bestStart + bestLength + padding);
   return sentences.slice(paddedStart, paddedEnd).join(" ");
 }
