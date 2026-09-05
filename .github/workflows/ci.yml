@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -14,10 +14,8 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Check out JR03 branch
+      - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: jr03/rag-job-readiness
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -25,34 +23,11 @@ jobs:
           node-version: "22"
           cache: npm
 
-      - name: Refresh fixable lockfile packages
-        run: npm update --package-lock-only brace-expansion browserslist js-yaml nanoid postcss
-
-      - name: Install regenerated dependencies
+      - name: Install dependencies
         run: npm ci
 
       - name: Audit production dependencies
         run: npm audit --omit=dev
-
-      - name: Verify remediated dependency chains
-        run: |
-          npm explain nanoid
-          npm explain postcss
-          npm explain brace-expansion
-          npm explain browserslist
-          npm explain js-yaml
-
-      - name: Commit regenerated lockfile if changed
-        run: |
-          if git diff --quiet -- package-lock.json; then
-            echo "package-lock.json already current"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "Refresh security-patched dependency lockfile"
-            git push origin HEAD:jr03/rag-job-readiness
-          fi
 
       - name: Type-check
         run: npm run typecheck
