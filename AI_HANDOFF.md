@@ -1,29 +1,19 @@
 # AI Handoff — RAG Research Assistant
 
-> Paste this file into ChatGPT, Claude, Gemini, Copilot or another AI assistant to continue the project. Always verify the current `main` branch, open pull requests, dependency versions, deployment and latest CI before changing anything.
-
-## Continuation instruction
-
-You are continuing `Meettala/rag-research-assistant`, a public MIT-licensed portfolio and reference implementation owned by Meet Tala.
-
-Read the live code, tests, `README.md`, `SECURITY.md`, `docs/evaluation.md`, `docs/LIVE_VALIDATION_FINDINGS_2026-08-02.md` and the latest pull requests before editing. Add positive and negative tests for behavioural changes. Never commit API keys, customer data, private prompts or confidential documents.
+> Always verify the current `main` branch, open pull requests, dependency versions, deployment and latest CI before changing anything.
 
 ## Current repository state
 
-- Repository: `Meettala/rag-research-assistant`
-- Default branch: `main`
-- Stack: Next.js 16.2.11, React 19.2.4, TypeScript, Tailwind CSS and Vitest
-- Licence: MIT
-- Major correctness PR: PR #3
-- PR #3 merge commit: `7809d6dc338d97eba461fd2be1486797958cdeaf`
-- Latest live-findings commit: `7315bce664bbf5648d649caad6831a868369ed59`
-- Last updated: 2 August 2026
+Repository: `Meettala/rag-research-assistant`  
+Stack: Next.js 16.2.11, React 19.2.4, TypeScript, Tailwind CSS and Vitest  
+Licence: MIT  
+Package version: 0.1.0 with substantial work still under `[Unreleased]`
 
 ## Product purpose
 
 The application accepts pasted document evidence and a research question, builds a local TF-IDF index, retrieves relevant chunks and returns either a cited answer or an explicit not-covered result.
 
-The no-key mode is extractive and local. Optional OpenAI or Anthropic synthesis operates only over retrieved excerpts and remains subordinate to strict provider-response and citation validation.
+The deterministic no-key path is primary. Optional OpenAI or Anthropic synthesis is automatically available when the corresponding provider key exists. Provider mode sends the user question and retrieved excerpts to that provider, but provider output remains subordinate to strict schema and citation validation.
 
 ## Trust model
 
@@ -32,133 +22,110 @@ The no-key mode is extractive and local. Optional OpenAI or Anthropic synthesis 
 3. Retrieval happens before answering.
 4. Evidence coverage and key-term checks decide whether retrieved text supports an answer.
 5. Unsupported questions should be refused instead of guessed.
-6. Document instructions remain inert evidence and must never be executed.
-7. Provider output is accepted only when schema-valid and limited to retrieved citation IDs.
-8. Provider failures fall back to local extractive mode.
-9. The project does not claim universal correctness, complete prompt-injection immunity or zero hallucinations.
+6. Explicit negative evidence can support a direct `No` only through a narrow lexical proposition-overlap rule; this is not general contradiction reasoning.
+7. Document instructions remain inert evidence and must never be executed.
+8. Safe questions asking what hostile text says may describe that text without following it.
+9. Provider output is accepted only when schema-valid and limited to retrieved citation IDs.
+10. Provider failures fall back to local extractive mode.
+11. The project does not claim universal correctness, complete prompt-injection immunity or zero hallucinations.
 
-## Implemented correctness upgrade
+## Historical live validation — 2 August 2026
 
-PR #3 added:
+The deployed app was tested against a synthetic Northstar Analytics report with seven questions.
 
-- deterministic evidence-coverage answerability checks;
-- a key-term gate so topical similarity alone cannot justify an answer;
-- coverage-based passage selection;
-- sentence-boundary-aligned extraction;
-- calibrated chunk defaults of 600 characters with 75-character overlap;
-- answer reason and evidence coverage in API results;
-- permanent deterministic evaluation in CI;
-- 57 labelled evaluation cases across three synthetic documents;
-- 37 answerable and 20 unanswerable questions;
-- retrieval, abstention, false-answer, over-refusal, accuracy and answer-length metrics.
-
-CI run #68 passed TypeScript, ESLint, unit tests, the full evaluation, production build and OSV dependency scanning before merge.
-
-## Committed evaluation thresholds
-
-Minimums:
-
-- Hit@1: 94.59%
-- Hit@3: 100%
-- MRR: 0.973
-- answer accuracy: 72.97%
-- abstention recall: 90%
-- overall accuracy: 78.95%
-
-Maximums:
-
-- over-refusal: 24.32%
-- false-answer rate: 10%
-- mean answer length: 435 characters
-
-Do not weaken these thresholds merely to make failures pass. Improve behaviour and ratchet thresholds upward when justified by evidence.
-
-## Post-deployment live validation
-
-The deployed app was tested against the Northstar Analytics report with seven questions.
-
-### Correct live outcomes
-
-- Average weekly time saving: returned 3.8 hours, but too verbosely.
-- Highest AI adoption: returned software engineers at 91%, but too verbosely.
-- Estimated net benefit: returned £214,000, but too verbosely.
-- CEO question: correctly refused because no CEO is named.
-
-### Incorrect live outcomes
-
-The system incorrectly refused three answerable questions:
-
-1. `Did Northstar suffer a confirmed data breach?`
-   - Expected: No; the report explicitly states no confirmed data breach occurred.
-
-2. `What did the prompt-injection sentence tell the system to claim?`
-   - Expected: It instructed the system to claim Northstar lost £10 million.
-   - This is safe description of malicious text, not execution of it.
-
-3. `According to the actual report, did Northstar lose £10 million?`
-   - Expected: No; the report states no £10 million loss was disclosed.
-
-Measured live result:
+Historical live result:
 
 - 4 of 7 correct;
 - 3 of 7 incorrect over-refusals;
 - unsupported CEO hallucination fixed;
 - prompt-injection execution prevented;
-- supported answers remain too long.
+- supported answers remained too long.
 
-See `docs/LIVE_VALIDATION_FINDINGS_2026-08-02.md` for the full evidence and required regression expectations.
+The three over-refusals were:
 
-## Required next engineering work
+1. confirmed data breach → should have answered grounded `No`;
+2. safe description of the prompt-injection sentence → should have described the sentence;
+3. actual £10 million loss → should have answered grounded `No` because the report explicitly denied it.
 
-Do not globally lower the evidence threshold.
+This historical evidence is intentionally preserved in `docs/LIVE_VALIDATION_FINDINGS_2026-08-02.md`.
 
-1. Add negation-aware evidence handling.
-   - Recognise explicit negative evidence such as `no confirmed`, `not`, `never`, `did not` and `does not`.
-   - Allow explicit negative sentences to support yes/no answers.
+## JR03 automated correction — 5 September 2026
 
-2. Add safe quoted-instruction analysis.
-   - Permit questions that ask what malicious text says.
-   - Continue to block execution of that text.
+JR03 adds narrow deterministic support without lowering the global retrieval/evidence thresholds:
 
-3. Add contradiction-aware answers.
-   - When a document explicitly denies a claim, answer `No` with the denying sentence cited.
+- explicit-negative evidence handling for positive yes/no questions when retrieval score and proposition overlap remain strong;
+- safe metalinguistic handling for questions about hostile/instruction text;
+- direct `No` formatting using the supporting negative evidence;
+- concise one/two-sentence extraction for direct quantitative/time/ranking answers while retaining broader evidence for other questions;
+- abbreviation-safe sentence splitting for forms such as `a.m.` and `p.m.`;
+- reconstructed regressions for all seven documented Northstar outcomes;
+- an unrelated Harborview fixture with supported, explicit-negative and unsupported questions;
+- Docker verification and current production dependency auditing in CI.
 
-4. Improve concise extraction.
-   - Prefer the smallest directly relevant sentence or sentence pair.
+The dedicated JR03 regression file contains 18 assertions over 10 labelled cases. On the current JR03 branch all 18 pass, including the three former over-refusals and the still-unsupported CEO case.
 
-5. Add exact live regressions.
-   - no confirmed data breach;
-   - prompt-injection sentence description;
-   - actual £10 million loss denial;
-   - CEO remains unsupported;
-   - numeric answers remain correct and concise.
+## Current deterministic evaluation
 
-6. Validate beyond Northstar.
-   - Test at least one unrelated document with supported and unsupported questions.
+The existing golden evaluation remains 57 cases across three synthetic documents: 37 answerable and 20 unanswerable.
 
-## Release rule
+Current metrics:
 
-Do not mark live behaviour as fully validated until:
+- Hit@1: 94.6%
+- Hit@3: 100.0%
+- MRR@3: 0.973
+- answer accuracy: 73.0%
+- over-refusal: 24.3%
+- abstention recall: 90.0%
+- false-answer rate: 10.0%
+- overall accuracy: 79.0%
+- mean answer length: 274 characters
 
-- all seven Northstar questions pass;
-- the three over-refusal failures are fixed;
-- supported answers are concise;
-- the CEO question still refuses;
-- malicious document text can be described safely without being followed;
-- an unrelated document also passes mixed supported and unsupported testing.
+The committed thresholds were not lowered. Some known golden-set cases still fail inside the permitted envelope; do not describe the system as universally accurate or hallucination-free.
 
-## Broader scope
+## Current verification gate
 
-Northstar is only a regression document. The intended application must work across arbitrary text documents and topics.
+JR03 CI runs:
 
-The current evaluation and live tests do not prove universal accuracy. Future work should test different domains, writing styles, explicit negatives, contradictions, quoted malicious text, vague wording, unsupported questions and multi-sentence evidence.
+- `npm ci`;
+- `npm audit --omit=dev`;
+- TypeScript typecheck;
+- zero-warning ESLint;
+- Vitest unit/regression tests;
+- `npm run eval`;
+- production Next.js build;
+- OSV lockfile scan with `fail-on-vuln: true`;
+- Docker image build;
+- non-root `nextjs` user verification;
+- no-provider-key homepage smoke.
+
+The stale OSV ignore for `CVE-2026-14257` was removed after dependency remediation; no replacement suppression was added.
+
+## Release rule and remaining condition
+
+Do **not** mark the corrected live RAG behaviour fully validated yet.
+
+Candidate deployment:
+
+`https://rag-research-assistant-brown.vercel.app`
+
+After JR03 merges and deploys, complete the seven Northstar questions plus one unrelated document containing an answerable question, explicit negative and unsupported question. Record actual results separately from the automated regression fixture.
+
+Until that fresh browser smoke passes:
+
+- keep package version `0.1.0`;
+- keep JR03 under `[Unreleased]`;
+- do not claim a formal release;
+- qualify the deployment as recorded/currently unverified after JR03.
+
+See `docs/JR03_AUTOMATED_FOLLOW_UP_2026-09-05.md`.
 
 ## Rules for another AI
 
-- Inspect the live implementation and CI before editing.
+- Inspect live code and CI before editing.
+- Preserve the retrieval/evidence thresholds unless a separate reviewed change explicitly authorises modification.
 - Keep retrieved document text inert.
 - Preserve provider schema validation and citation allow-listing.
-- Add behavioural tests for every fix.
-- Do not silently lower thresholds.
-- Separate measured evidence from assumptions.
-- Update this file and the live-findings document after material changes.
+- Add positive and negative tests for behavioural changes.
+- Do not tune only to Northstar.
+- Separate historical live results, current automated evidence and future deployment evidence.
+- Never invent screenshots, deployment results, metrics or provider/privacy guarantees.

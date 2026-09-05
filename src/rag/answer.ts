@@ -10,8 +10,9 @@ import {
   assessAnswerability,
   buildNormalizedIdf,
   NO_ANSWER_THRESHOLD,
+  type AnswerabilitySupportKind,
 } from "./answerability";
-import { selectAnswerSpan } from "./extract";
+import { selectAnswerSpan, shouldCompactAnswer } from "./extract";
 import type { RetrievalResult, VectorIndex } from "./retrieval";
 
 const PROVIDER_TIMEOUT_MS = 15_000;
@@ -55,6 +56,8 @@ export async function answerQuestion(
   let selectedResults = results;
   let reason: AnswerResult["reason"] = "supported";
   let coverage = 0;
+  let supportKind: AnswerabilitySupportKind = "standard";
+  let supportSpan: string | undefined;
 
   if (options.index) {
     const decision = assessAnswerability(
@@ -65,6 +68,8 @@ export async function answerQuestion(
     );
     reason = decision.reason;
     coverage = decision.signals.evidenceCoverage;
+    supportKind = decision.supportKind;
+    supportSpan = decision.supportSpan;
     if (!decision.answerable) {
       return {
         answer: NOT_COVERED_MESSAGE,
@@ -99,7 +104,16 @@ export async function answerQuestion(
     }
   }
 
-  return answerExtractively(question, selectedResults, topScore, options.index, reason, coverage);
+  return answerExtractively(
+    question,
+    selectedResults,
+    topScore,
+    options.index,
+    reason,
+    coverage,
+    supportKind,
+    supportSpan,
+  );
 }
 
 function answerExtractively(
@@ -109,6 +123,8 @@ function answerExtractively(
   index: VectorIndex | undefined,
   reason: AnswerResult["reason"],
   evidenceCoverage: number,
+  supportKind: AnswerabilitySupportKind,
+  supportSpan: string | undefined,
 ): AnswerResult {
   const best = results[0];
   if (!best) {
@@ -122,9 +138,14 @@ function answerExtractively(
     };
   }
 
-  const answer = index
+  const span = supportSpan ?? (index && shouldCompactAnswer(question, best.chunk.text)
     ? selectAnswerSpan(question, best.chunk.text, buildNormalizedIdf(index))
-    : best.chunk.text;
+    : best.chunk.text);
+  const answer = supportKind === "explicit_negative"
+    ? `No. ${span}`
+    : supportKind === "instruction_description"
+      ? `The document says: ${span}`
+      : span;
 
   return {
     answer,
