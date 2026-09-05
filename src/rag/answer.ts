@@ -12,7 +12,7 @@ import {
   NO_ANSWER_THRESHOLD,
   type AnswerabilitySupportKind,
 } from "./answerability";
-import { selectAnswerSpan } from "./extract";
+import { selectAnswerSpan, shouldCompactAnswer } from "./extract";
 import type { RetrievalResult, VectorIndex } from "./retrieval";
 
 const PROVIDER_TIMEOUT_MS = 15_000;
@@ -138,7 +138,7 @@ function answerExtractively(
     };
   }
 
-  const span = supportSpan ?? (index
+  const span = supportSpan ?? (index && shouldCompactAnswer(question, best.chunk.text)
     ? selectAnswerSpan(question, best.chunk.text, buildNormalizedIdf(index))
     : best.chunk.text);
   const answer = supportKind === "explicit_negative"
